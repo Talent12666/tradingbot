@@ -51,14 +51,14 @@ const SYMBOL_MAP = {
     "CRASH300": "crash300", "CRASH500": "crash500", "CRASH1000": "crash1000"
 };
 
-// Store price history for trend analysis (last 50 prices)
+// Store price history for trend analysis (last 200 prices)
 const priceHistory = {};
 
 // WebSocket connection manager
 let wsPingInterval;
 
 function connect() {
-    const ws = new WebSocket('wss://ws.derivws.com/websockets/v3?app_id=1089');
+    const ws = new WebSocket('wss://ws.derivws.com/websockets/v3?app_id=69860');
 
     ws.on('open', () => {
         console.log('WS Connected');
@@ -82,7 +82,7 @@ function connect() {
 
             if (!priceHistory[symbol]) priceHistory[symbol] = [];
             priceHistory[symbol].push(price);
-            if (priceHistory[symbol].length > 50) priceHistory[symbol].shift();
+            if (priceHistory[symbol].length > 200) priceHistory[symbol].shift();
 
             console.log(`Price update for ${symbol}: ${price}`);
         }
@@ -104,51 +104,77 @@ function connect() {
 // Start WebSocket connection
 let ws = connect();
 
-// Calculate SMA (Simple Moving Average)
-function calculateSMA(prices, period) {
+// Calculate EMA (Exponential Moving Average)
+function calculateEMA(prices, period) {
     if (prices.length < period) return null;
-    return prices.slice(-period).reduce((a, b) => a + b, 0) / period;
+    const multiplier = 2 / (period + 1);
+    let ema = prices[0];
+    for (let i = 1; i < prices.length; i++) {
+        ema = (prices[i] - ema) * multiplier + ema;
+    }
+    return ema;
 }
 
-// Determine trend using 20 SMA and 50 SMA
+// Determine trend using 21 EMA, 50 EMA, and 200 EMA
 function determineTrend(symbol) {
     const prices = priceHistory[symbol] || [];
-    const sma20 = calculateSMA(prices, 20);
-    const sma50 = calculateSMA(prices, 50);
+    const ema21 = calculateEMA(prices, 21);
+    const ema50 = calculateEMA(prices, 50);
+    const ema200 = calculateEMA(prices, 200);
 
-    if (!sma20 || !sma50) return "N/A (Insufficient data)";
-    return sma20 > sma50 ? "Bullish" : "Bearish";
+    if (!ema21 || !ema50 || !ema200) return "N/A (Insufficient data)";
+
+    // Trend confirmation
+    if (prices[prices.length - 1] > ema200) {
+        return "Bullish";
+    } else if (prices[prices.length - 1] < ema200) {
+        return "Bearish";
+    } else {
+        return "Neutral";
+    }
 }
 
-// Generate signal with winrate >50%
-function generateSignal(trend) {
-    const baseChance = trend === "Bullish" ? 0.65 : 0.60;
-    const successChance = Math.min(baseChance + Math.random() * 0.15, 0.95);
-    return {
-        signal: trend === "Bullish" ? "BUY" : "SELL",
-        confidence: `${Math.floor(successChance * 100)}%`
-    };
+// Generate signal based on EMA crossovers
+function generateSignal(symbol) {
+    const prices = priceHistory[symbol] || [];
+    const ema21 = calculateEMA(prices, 21);
+    const ema50 = calculateEMA(prices, 50);
+
+    if (!ema21 || !ema50) return { signal: "N/A", confidence: "N/A" };
+
+    if (ema21 > ema50) {
+        return { signal: "BUY", confidence: "High" };
+    } else if (ema21 < ema50) {
+        return { signal: "SELL", confidence: "High" };
+    } else {
+        return { signal: "Hold", confidence: "Low" };
+    }
 }
 
-// Calculate SL and TP using 15-minute timeframe
-function calculateLevels(currentPrice, trend) {
-    const volatilityFactor = 0.0035; // 0.35% for 15-minute timeframe
-    const sl = trend === "Bullish" 
-        ? (currentPrice * (1 - volatilityFactor)).toFixed(5) 
-        : (currentPrice * (1 + volatilityFactor)).toFixed(5);
-    const tp1 = trend === "Bullish"
-        ? (currentPrice * (1 + volatilityFactor)).toFixed(5)
-        : (currentPrice * (1 - volatilityFactor)).toFixed(5);
-    const tp2 = trend === "Bullish"
-        ? (currentPrice * (1 + volatilityFactor * 2)).toFixed(5)
-        : (currentPrice * (1 - volatilityFactor * 2)).toFixed(5);
+// Calculate SL and TP
+function calculateLevels(prices, signal) {
+    const currentPrice = prices[prices.length - 1];
+    const swingLow = Math.min(...prices.slice(-10));
+    const swingHigh = Math.max(...prices.slice(-10));
 
-    return { sl, tp1, tp2 };
+    if (signal === "BUY") {
+        const sl = swingLow;
+        const tp1 = currentPrice + (currentPrice - sl) * 2;
+        const tp2 = tp1 + (tp1 - currentPrice);
+        return { sl, tp1, tp2 };
+    } else if (signal === "SELL") {
+        const sl = swingHigh;
+        const tp1 = currentPrice - (sl - currentPrice) * 2;
+        const tp2 = tp1 - (currentPrice - tp1);
+        return { sl, tp1, tp2 };
+    } else {
+        return { sl: "N/A", tp1: "N/A", tp2: "N/A" };
+    }
 }
 
 // Greeting message
 const GREETING_MESSAGE = `
-📈 Trading Bot - Supported Assets:
+📈 Space Zero Bot - Supported Assets:
 • Forex: EURUSD, GBPUSD, USDJPY, AUDUSD, USDCAD, USDCHF, NZDUSD, EURGBP
 • Commodities: XAUUSD, XAGUSD, XPTUSD, XPDUSD
 • Indices: SPX, NDX, DJI, FTSE, DAX, NIKKEI, HSI, ASX, CAC
@@ -206,17 +232,17 @@ app.post('/webhook', (req, res) => {
                 responseMessage = `❌ No price data received yet for ${incomingMsg}.`;
             } else {
                 const trend = determineTrend(derivSymbol);
-                const { signal, confidence } = generateSignal(trend);
-                const { sl, tp1, tp2 } = calculateLevels(currentPrice, trend);
+                const { signal, confidence } = generateSignal(derivSymbol);
+                const { sl, tp1, tp2 } = calculateLevels(prices, signal);
 
                 responseMessage = `
 📊 ${incomingMsg} Analysis
 Trend: ${trend}
-Signal: ${signal} (${confidence} Success Chance)
+Signal: ${signal} (${confidence} Confidence)
 Entry: ${currentPrice.toFixed(5)}
-SL: ${sl}
-TP1: ${tp1}
-TP2: ${tp2}
+SL: ${sl.toFixed(5)}
+TP1: ${tp1.toFixed(5)}
+TP2: ${tp2.toFixed(5)}
 `;
             }
         } else if (incomingMsg.startsWith('ALERT ')) {
