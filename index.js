@@ -53,31 +53,31 @@ const SYMBOL_MAP = {
     "DOTUSD": { symbol: "cryDOTUSD", category: "crypto" },
     "SOLUSD": { symbol: "crySOLUSD", category: "crypto" },
     // Synthetics
-    "R_100": { symbol: "1HZ100V", category: "synthetics" }, // Volatility 100 Index
-    "R_50": { symbol: "1HZ50V", category: "synthetics" }, // Volatility 50 Index
-    "R_25": { symbol: "1HZ25V", category: "synthetics" }, // Volatility 25 Index
-    "R_10": { symbol: "1HZ10V", category: "synthetics" }, // Volatility 10 Index
-    "JD10": { symbol: "JD10", category: "synthetics" }, // Jump 10 Index
-    "JD25": { symbol: "JD25", category: "synthetics" }, // Jump 25 Index
-    "JD50": { symbol: "JD50", category: "synthetics" }, // Jump 50 Index
-    "JD100": { symbol: "JD100", category: "synthetics" }, // Jump 100 Index
-    "BOOM300": { symbol: "BOOM300", category: "synthetics" }, // Boom 300 Index
-    "BOOM500": { symbol: "BOOM500", category: "synthetics" }, // Boom 500 Index
-    "BOOM1000": { symbol: "BOOM1000", category: "synthetics" }, // Boom 1000 Index
-    "CRASH300": { symbol: "CRASH300", category: "synthetics" }, // Crash 300 Index
-    "CRASH500": { symbol: "CRASH500", category: "synthetics" }, // Crash 500 Index
-    "CRASH1000": { symbol: "CRASH1000", category: "synthetics" }, // Crash 1000 Index
+    "BOOM300": { symbol: "boom300", category: "synthetics" }, // Boom 300 Index
+    "BOOM500": { symbol: "boom500", category: "synthetics" }, // Boom 500 Index
+    "BOOM1000": { symbol: "boom1000", category: "synthetics" }, // Boom 1000 Index
+    "CRASH300": { symbol: "crash300", category: "synthetics" }, // Crash 300 Index
+    "CRASH500": { symbol: "crash500", category: "synthetics" }, // Crash 500 Index
+    "CRASH1000": { symbol: "crash1000", category: "synthetics" }, // Crash 1000 Index
 };
 
 // Store price history for trend analysis (last 15 prices)
 const priceHistory = {};
 
 // WebSocket connection manager
+let wsPingInterval;
+
 function connect() {
-    const ws = new WebSocket('wss://ws.derivws.com/websockets/v3?app_id=69860');
+    const ws = new WebSocket('wss://ws.derivws.com/websockets/v3?app_id=1089');
 
     ws.on('open', () => {
         console.log('WebSocket connected');
+        // Add ping every 30 seconds to keep the connection alive
+        wsPingInterval = setInterval(() => {
+            ws.ping();
+        }, 30000);
+
+        // Subscribe to all pairs
         Object.keys(SYMBOL_MAP).forEach(symbol => {
             const derivSymbol = SYMBOL_MAP[symbol].symbol;
             ws.send(JSON.stringify({ 
@@ -96,6 +96,8 @@ function connect() {
 
     ws.on('message', (data) => {
         const message = JSON.parse(data);
+        console.log('WebSocket message:', message); // Debugging: Log the raw message
+
         if (message.msg_type === 'tick' && message.tick) {
             const { symbol, bid, ask } = message.tick;
             const price = (bid + ask) / 2;
@@ -106,13 +108,21 @@ function connect() {
             if (priceHistory[symbol].length > 15) priceHistory[symbol].shift();
             
             console.log(`Price update for ${symbol}: ${price}`);
+        } else if (message.msg_type === 'ping') {
+            console.log('Received ping from WebSocket server');
+        } else {
+            console.log('Unknown message type:', message.msg_type);
         }
     });
 
-    ws.on('error', (error) => console.error('WebSocket error:', error));
+    ws.on('error', (error) => {
+        console.error('WebSocket error:', error);
+    });
+
     ws.on('close', () => {
         console.log('WebSocket disconnected - reconnecting in 5s');
-        setTimeout(connect, 5000);
+        clearInterval(wsPingInterval); // Clear the ping interval
+        setTimeout(connect, 5000); // Reconnect after 5 seconds
     });
 
     return ws;
@@ -153,7 +163,7 @@ Supported Instruments:
 • Crypto: BTCUSD, ETHUSD, XRPUSD, LTCUSD, BCHUSD, ADAUSD, DOTUSD, SOLUSD
 • ETFs: SPY, QQQ, GLD, XLF, IWM, EEM
 • Stocks: AAPL, TSLA, AMZN, GOOGL, MSFT, META, NVDA, NFLX
-• Synthetics: R_100, R_50, R_25, R_10, JD10, JD25, JD50, JD100, BOOM300, BOOM500, BOOM1000, CRASH300, CRASH500, CRASH1000
+• Synthetics: BOOM300, BOOM500, BOOM1000, CRASH300, CRASH500, CRASH1000
 
 Commands:
 ➤ Analysis: XAUUSD
