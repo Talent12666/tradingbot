@@ -58,7 +58,7 @@ const priceHistory = {};
 let wsPingInterval;
 
 function connect() {
-    const ws = new WebSocket('wss://ws.derivws.com/websockets/v3?app_id=69860');
+    const ws = new WebSocket('wss://ws.derivws.com/websockets/v3?app_id=1089');
 
     ws.on('open', () => {
         console.log('WS Connected');
