@@ -6,6 +6,12 @@ require('dotenv').config();
 const app = express();
 const port = process.env.PORT || 3000;
 
+// Debugging: Check if environment variables are loaded
+if (!process.env.TWILIO_SID || !process.env.TWILIO_AUTH_TOKEN) {
+    console.error('Twilio credentials are missing. Please check your environment variables.');
+    process.exit(1); // Exit the app if credentials are missing
+}
+
 // Twilio setup
 const twilioClient = new twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
 
@@ -64,22 +70,33 @@ const SYMBOL_MAP = {
 };
 
 // WebSocket setup
-const ws = new WebSocket('wss://ws.derivws.com/websockets/v3?app_id=1089');
+const ws = new WebSocket('wss://ws.derivws.com/websockets/v3?app_id=69860');
 
 ws.on('open', () => {
     console.log('WebSocket connected');
     // Subscribe to all pairs
     Object.keys(SYMBOL_MAP).forEach(symbol => {
-        ws.send(JSON.stringify({ ticks: symbol, subscribe: 1 }));
+        const payload = {
+            ticks: symbol,
+            subscribe: 1,
+        };
+        ws.send(JSON.stringify(payload));
+        console.log(`Subscribed to ${symbol}`);
     });
 });
 
 ws.on('message', (data) => {
     const message = JSON.parse(data);
-    if (message.msg_type === 'tick') {
+    console.log('WebSocket message:', message); // Debugging: Log the raw message
+
+    if (message.msg_type === 'tick' && message.tick) {
         const { symbol, bid, ask } = message.tick;
         const price = (bid + ask) / 2;
         console.log(`Price update for ${symbol}: ${price}`);
+    } else if (message.msg_type === 'ping') {
+        console.log('Received ping from WebSocket server');
+    } else {
+        console.log('Unknown message type:', message.msg_type);
     }
 });
 
