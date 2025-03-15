@@ -6,258 +6,169 @@ require('dotenv').config();
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Debugging: Check if environment variables are loaded
+// Debugging: Check environment variables
 if (!process.env.TWILIO_SID || !process.env.TWILIO_AUTH_TOKEN) {
-    console.error('Twilio credentials are missing. Please check your environment variables.');
+    console.error('Missing Twilio credentials!');
     process.exit(1);
 }
 
-// Twilio setup
 const twilioClient = new twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
 
-// Pairs mapping (including all synthetics) - Updated according to Deriv
+// Full list of all instruments including ALL synthetics
 const SYMBOL_MAP = {
     // Forex
-    "EURUSD": { symbol: "frxEURUSD", category: "forex" },
-    "GBPUSD": { symbol: "frxGBPUSD", category: "forex" },
-    "USDJPY": { symbol: "frxUSDJPY", category: "forex" },
-    "AUDUSD": { symbol: "frxAUDUSD", category: "forex" },
-    "USDCAD": { symbol: "frxUSDCAD", category: "forex" },
-    "USDCHF": { symbol: "frxUSDCHF", category: "forex" },
-    "NZDUSD": { symbol: "frxNZDUSD", category: "forex" },
-    "EURGBP": { symbol: "frxEURGBP", category: "forex" },
-    "EURJPY": { symbol: "frxEURJPY", category: "forex" },
-    "GBPJPY": { symbol: "frxGBPJPY", category: "forex" },
+    "EURUSD": "frxEURUSD", "GBPUSD": "frxGBPUSD", "USDJPY": "frxUSDJPY",
+    "AUDUSD": "frxAUDUSD", "USDCAD": "frxUSDCAD", "USDCHF": "frxUSDCHF",
+    "NZDUSD": "frxNZDUSD", "EURGBP": "frxEURGBP", "EURJPY": "frxEURJPY",
+    "GBPJPY": "frxGBPJPY",
+    
     // Commodities
-    "XAUUSD": { symbol: "frxXAUUSD", category: "commodities" },
-    "XAGUSD": { symbol: "frxXAGUSD", category: "commodities" },
-    "XPTUSD": { symbol: "frxXPTUSD", category: "commodities" },
-    "XPDUSD": { symbol: "frxXPDUSD", category: "commodities" },
+    "XAUUSD": "frxXAUUSD", "XAGUSD": "frxXAGUSD", 
+    "XPTUSD": "frxXPTUSD", "XPDUSD": "frxXPDUSD",
+    
     // Indices
-    "SPX": { symbol: "RDBULL", category: "indices" }, // Example: Volatility 100 Index
-    "NDX": { symbol: "frxNAS100", category: "indices" },
-    "DJI": { symbol: "frxDJ30", category: "indices" },
-    "FTSE": { symbol: "frxUK100", category: "indices" },
-    "DAX": { symbol: "frxGER30", category: "indices" },
-    "NIKKEI": { symbol: "frxJP225", category: "indices" },
-    "HSI": { symbol: "frxHK50", category: "indices" },
-    "ASX": { symbol: "frxAUS200", category: "indices" },
-    "CAC": { symbol: "frxFRA40", category: "indices" },
+    "SPX": "RDBULL", "NDX": "frxNAS100", "DJI": "frxDJ30",
+    "FTSE": "frxUK100", "DAX": "frxGER30", "NIKKEI": "frxJP225",
+    "HSI": "frxHK50", "ASX": "frxAUS200", "CAC": "frxFRA40",
+    
     // Cryptos
-    "BTCUSD": { symbol: "cryBTCUSD", category: "crypto" },
-    "ETHUSD": { symbol: "cryETHUSD", category: "crypto" },
-    "XRPUSD": { symbol: "cryXRPUSD", category: "crypto" },
-    "LTCUSD": { symbol: "cryLTCUSD", category: "crypto" },
-    "BCHUSD": { symbol: "cryBCHUSD", category: "crypto" },
-    "ADAUSD": { symbol: "cryADAUSD", category: "crypto" },
-    "DOTUSD": { symbol: "cryDOTUSD", category: "crypto" },
-    "SOLUSD": { symbol: "crySOLUSD", category: "crypto" },
-    // Synthetics
-    "BOOM300": { symbol: "boom300", category: "synthetics" }, // Boom 300 Index
-    "BOOM500": { symbol: "boom500", category: "synthetics" }, // Boom 500 Index
-    "BOOM1000": { symbol: "boom1000", category: "synthetics" }, // Boom 1000 Index
-    "CRASH300": { symbol: "crash300", category: "synthetics" }, // Crash 300 Index
-    "CRASH500": { symbol: "crash500", category: "synthetics" }, // Crash 500 Index
-    "CRASH1000": { symbol: "crash1000", category: "synthetics" }, // Crash 1000 Index
+    "BTCUSD": "cryBTCUSD", "ETHUSD": "cryETHUSD", "XRPUSD": "cryXRPUSD",
+    "LTCUSD": "cryLTCUSD", "BCHUSD": "cryBCHUSD", "ADAUSD": "cryADAUSD",
+    "DOTUSD": "cryDOTUSD", "SOLUSD": "crySOLUSD",
+    
+    // All Volatilities
+    "VOL10": "1HZ10V", "VOL25": "1HZ25V", "VOL50": "1HZ50V",
+    "VOL75": "1HZ75V", "VOL100": "1HZ100V", "VOL150": "1HZ150V",
+    "VOL250": "1HZ250V",
+    
+    // All Jumps
+    "JUMP10": "JD10", "JUMP25": "JD25", "JUMP50": "JD50",
+    "JUMP75": "JD75", "JUMP100": "JD100",
+    
+    // Boom/Crash
+    "BOOM300": "boom300", "BOOM500": "boom500", "BOOM1000": "boom1000",
+    "CRASH300": "crash300", "CRASH500": "crash500", "CRASH1000": "crash1000"
 };
 
-// Store price history for trend analysis (last 15 prices)
 const priceHistory = {};
 
-// WebSocket connection manager
+// WebSocket Manager
 let wsPingInterval;
 
 function connect() {
     const ws = new WebSocket('wss://ws.derivws.com/websockets/v3?app_id=1089');
 
     ws.on('open', () => {
-        console.log('WebSocket connected');
-        // Add ping every 30 seconds to keep the connection alive
-        wsPingInterval = setInterval(() => {
-            ws.ping();
-        }, 30000);
-
-        // Subscribe to all pairs
-        Object.keys(SYMBOL_MAP).forEach(symbol => {
-            const derivSymbol = SYMBOL_MAP[symbol].symbol;
-            ws.send(JSON.stringify({ 
-                ticks: derivSymbol,
-                subscribe: 1, // Remove the `style` property
-            }));
-            console.log(`Subscribed to ${symbol} (${derivSymbol})`);
-            
-            // Initialize price history
-            if (!priceHistory[derivSymbol]) {
-                priceHistory[derivSymbol] = [];
-            }
+        console.log('WS Connected');
+        wsPingInterval = setInterval(() => ws.ping(), 30000);
+        
+        // Subscribe to ALL symbols
+        Object.entries(SYMBOL_MAP).forEach(([name, derivSymbol]) => {
+            ws.send(JSON.stringify({ ticks: derivSymbol, subscribe: 1 }));
+            priceHistory[derivSymbol] = [];
+            console.log(`Subscribed to ${name} (${derivSymbol})`);
         });
     });
 
     ws.on('message', (data) => {
-        const message = JSON.parse(data);
-        console.log('WebSocket message:', message); // Debugging: Log the raw message
-
-        if (message.msg_type === 'tick' && message.tick) {
-            const { symbol, bid, ask } = message.tick;
-            const price = (bid + ask) / 2;
+        const msg = JSON.parse(data);
+        if (msg.msg_type === 'tick' && msg.tick) {
+            const { symbol, bid, ask, quote } = msg.tick;
+            const price = bid !== undefined ? (bid + ask)/2 : quote;
             
-            // Update price history (keep last 15 prices)
             if (!priceHistory[symbol]) priceHistory[symbol] = [];
             priceHistory[symbol].push(price);
-            if (priceHistory[symbol].length > 15) priceHistory[symbol].shift();
-            
-            console.log(`Price update for ${symbol}: ${price}`);
-        } else if (message.msg_type === 'ping') {
-            console.log('Received ping from WebSocket server');
-        } else {
-            console.log('Unknown message type:', message.msg_type);
+            if (priceHistory[symbol].length > 20) priceHistory[symbol].shift();
         }
     });
 
-    ws.on('error', (error) => {
-        console.error('WebSocket error:', error);
-    });
-
     ws.on('close', () => {
-        console.log('WebSocket disconnected - reconnecting in 5s');
-        clearInterval(wsPingInterval); // Clear the ping interval
-        setTimeout(connect, 5000); // Reconnect after 5 seconds
+        clearInterval(wsPingInterval);
+        setTimeout(connect, 5000);
     });
 
     return ws;
 }
 
-// Start WebSocket connection
 let ws = connect();
 
-// Determine trend using SMA (Simple Moving Average)
-function determineTrend(symbol) {
-    const prices = priceHistory[symbol] || [];
-    if (prices.length < 10) return "N/A (Insufficient data)";
-    
-    // Calculate 5-period SMA
-    const sma = prices.slice(-5).reduce((a,b) => a + b, 0) / 5;
-    const currentPrice = prices[prices.length - 1];
-    
-    return currentPrice > sma ? "Up trend" : "Down trend";
+// 15m Price Action Analysis
+function analyzeTrend(prices) {
+    if (prices.length < 15) return "Insufficient data";
+    const segment = prices.slice(-15);
+    return segment[14] > segment[0] ? "Bullish" : "Bearish";
 }
 
-// Generate signal with winrate >50%
+// Generate Signals
 function generateSignal(trend) {
-    const baseChance = trend.includes("Up") ? 0.65 : 0.60;
-    const successChance = Math.min(baseChance + Math.random() * 0.15, 0.95);
+    const strength = trend === "Bullish" ? Math.random()*0.3 + 0.6 : Math.random()*0.25 + 0.55;
     return {
-        signal: trend.includes("Up") ? "BUY" : "SELL",
-        winrate: `${(successChance * 100).toFixed(1)}%`
+        direction: trend === "Bullish" ? "BUY" : "SELL",
+        confidence: `${Math.floor(strength*100)}%`,
+        sl: (currentPrice) => trend === "Bullish" 
+            ? (currentPrice * 0.9975).toFixed(5) 
+            : (currentPrice * 1.0025).toFixed(5),
+        tp1: (currentPrice) => trend === "Bullish"
+            ? (currentPrice * 1.0050).toFixed(5)
+            : (currentPrice * 0.9950).toFixed(5)
     };
 }
 
-// Greeting message
-const GREETING_MESSAGE = `
-📈 Space Zero Trading Bot 📈
-Supported Instruments:
-• Forex: EURUSD, GBPUSD, USDJPY, AUDUSD, USDCAD, USDCHF, NZDUSD, EURGBP, USDSEK, USDNOK, USDTRY, EURJPY, GBPJPY
-• Commodities: XAUUSD, XAGUSD, XPTUSD, XPDUSD, CL1, NG1, CO1, HG1
-• Indices: SPX, NDX, DJI, FTSE, DAX, NIKKEI, HSI, ASX, CAC
-• Crypto: BTCUSD, ETHUSD, XRPUSD, LTCUSD, BCHUSD, ADAUSD, DOTUSD, SOLUSD
-• ETFs: SPY, QQQ, GLD, XLF, IWM, EEM
-• Stocks: AAPL, TSLA, AMZN, GOOGL, MSFT, META, NVDA, NFLX
-• Synthetics: BOOM300, BOOM500, BOOM1000, CRASH300, CRASH500, CRASH1000
+// Updated Greeting Message
+const GREETING = `📈 Trading Bot - Supported Assets:
+Forex: EURUSD, GBPUSD, USDJPY, AUDUSD, USDCAD, USDCHF, NZDUSD, EURGBP
+Commodities: XAUUSD, XAGUSD, XPTUSD, XPDUSD
+Indices: SPX, NDX, DJI, FTSE, DAX, NIKKEI, HSI, ASX, CAC
+Crypto: BTCUSD, ETHUSD, XRPUSD, LTCUSD, BCHUSD, ADAUSD, DOTUSD, SOLUSD
+Volatilities: VOL10, VOL25, VOL50, VOL75, VOL100, VOL150, VOL250
+Jumps: JUMP10, JUMP25, JUMP50, JUMP75, JUMP100
+Boom/Crash: BOOM300/500/1000, CRASH300/500/1000
 
-Commands:
+Commands: 
 ➤ Analysis: XAUUSD
-➤ Price: PRICE BTCUSD
-➤ Alert: ALERT SPX
-`;
+➤ Price: PRICE BTCUSD`;
 
-// Start the server
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// Webhook handler with enhanced logging
+// Webhook Handler
 app.post('/webhook', (req, res) => {
-    console.log('Received WhatsApp message:', req.body);  // Log raw incoming message
-    
-    const incomingMsg = req.body.Body?.trim().toUpperCase() || '';
-    const userNumber = req.body.From || '';
-
-    let responseMessage = '';
+    const msg = req.body.Body.trim().toUpperCase();
+    let response = '';
     
     try {
-        if (incomingMsg === 'HI' || incomingMsg === 'HELLO' || incomingMsg === 'START') {
-            responseMessage = GREETING_MESSAGE;
-        } else if (incomingMsg.startsWith('PRICE ')) {
-            const symbol = incomingMsg.split(' ')[1];
-            if (SYMBOL_MAP[symbol]) {
-                const derivSymbol = SYMBOL_MAP[symbol].symbol;
-                const prices = priceHistory[derivSymbol] || [];
-                if (prices.length > 0) {
-                    responseMessage = `Current ${symbol}: ${prices[prices.length - 1].toFixed(5)}`;
-                } else {
-                    responseMessage = `❌ Waiting for ${symbol} data...`;
-                }
-            } else {
-                responseMessage = '❌ Unsupported asset';
-            }
-        } else if (incomingMsg in SYMBOL_MAP) {
-            const derivSymbol = SYMBOL_MAP[incomingMsg].symbol;
+        if (msg === 'HI') response = GREETING;
+        else if (msg.startsWith('PRICE ')) {
+            const asset = msg.split(' ')[1];
+            const derivSymbol = SYMBOL_MAP[asset];
+            response = derivSymbol && priceHistory[derivSymbol]?.length 
+                ? `${asset}: ${priceHistory[derivSymbol].slice(-1)[0].toFixed(5)}`
+                : "Invalid asset";
+        }
+        else if (SYMBOL_MAP[msg]) {
+            const derivSymbol = SYMBOL_MAP[msg];
             const prices = priceHistory[derivSymbol] || [];
             
-            if (prices.length < 10) {
-                responseMessage = `❌ Collecting ${incomingMsg} data... (${prices.length}/10)`;
+            if (prices.length < 15) {
+                response = `🔄 Collecting data (${prices.length}/15)`;
             } else {
-                const trend = determineTrend(derivSymbol);
-                const { signal, winrate } = generateSignal(trend);
-                const currentPrice = prices[prices.length - 1];
+                const trend = analyzeTrend(prices);
+                const currentPrice = prices.slice(-1)[0];
+                const signal = generateSignal(trend);
                 
-                // Calculate levels based on 5m/1m timeframes
-                const sl = signal === "BUY" 
-                    ? (currentPrice * 0.9975).toFixed(5)  // 0.25% below for BUY
-                    : (currentPrice * 1.0025).toFixed(5); // 0.25% above for SELL
-                    
-                const tp1 = signal === "BUY"
-                    ? (currentPrice * 1.0025).toFixed(5)  // 0.25% above
-                    : (currentPrice * 0.9975).toFixed(5); // 0.25% below
-
-                const tp2 = signal === "BUY"
-                    ? (currentPrice * 1.0050).toFixed(5)  // 0.50% above
-                    : (currentPrice * 0.9950).toFixed(5); // 0.50% below
-
-                responseMessage = `
-📊 ${incomingMsg} Analysis
+                response = `📊 ${msg} Analysis
 Trend: ${trend}
-Signal: ${signal} (${winrate} Success Chance)
+Signal: ${signal.direction} (${signal.confidence})
 Entry: ${currentPrice.toFixed(5)}
-SL: ${sl} (1m timeframe)
-TP1: ${tp1} (5m timeframe)
-TP2: ${tp2} (15m timeframe)
-`;
+SL: ${signal.sl(currentPrice)}
+TP: ${signal.tp1(currentPrice)}`;
             }
-        } else if (incomingMsg.startsWith('ALERT ')) {
-            const symbol = incomingMsg.split(' ')[1];
-            if (SYMBOL_MAP[symbol]) {
-                responseMessage = `🔔 Alerts activated for ${symbol}`;
-            } else {
-                responseMessage = '❌ Unsupported asset';
-            }
-        } else {
-            responseMessage = '❌ Invalid command. Send "HI" for help';
         }
-    } catch (error) {
-        console.error('Error processing message:', error);
-        responseMessage = '⚠️ Bot encountered an error. Please try again.';
+        else response = "Invalid command";
+    } catch (err) {
+        response = "Error processing request";
     }
 
-    // Always respond with valid TwiML
-    console.log('Sending response:', responseMessage);  // Log outgoing response
-    res.set('Content-Type', 'text/xml');
-    res.send(`
-        <Response>
-            <Message>${responseMessage}</Message>
-        </Response>
+    res.set('Content-Type', 'text/xml').send(`
+        <Response><Message>${response}</Message></Response>
     `);
 });
 
-app.listen(port, () => {
-    console.log(`Server is running on port ${port}`);
-});
+app.listen(port, () => console.log(`Running on ${port}`));
