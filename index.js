@@ -69,6 +69,9 @@ const SYMBOL_MAP = {
     "CRASH1000": { symbol: "Crash 1000 Index", category: "synthetics" },
 };
 
+// Store the latest prices for each symbol
+const latestPrices = {};
+
 // WebSocket setup
 const ws = new WebSocket('wss://ws.derivws.com/websockets/v3?app_id=69860');
 
@@ -91,7 +94,8 @@ ws.on('message', (data) => {
 
     if (message.msg_type === 'tick' && message.tick) {
         const { symbol, bid, ask } = message.tick;
-        const price = (bid + ask) / 2;
+        const price = (bid + ask) / 2; // Calculate mid-price
+        latestPrices[symbol] = price; // Store the latest price
         console.log(`Price update for ${symbol}: ${price}`);
     } else if (message.msg_type === 'ping') {
         console.log('Received ping from WebSocket server');
@@ -160,9 +164,12 @@ app.post('/webhook', (req, res) => {
     } else if (incomingMsg.startsWith('PRICE ')) {
         const symbol = incomingMsg.split(' ')[1];
         if (SYMBOL_MAP[symbol]) {
-            // Fetch price from WebSocket data (simulated here)
-            const price = (Math.random() * 100).toFixed(5); // Replace with actual price logic
-            responseMessage = `Current ${symbol}: ${price}`;
+            const price = latestPrices[symbol]; // Get the latest price from WebSocket data
+            if (price !== undefined) {
+                responseMessage = `Current ${symbol}: ${price.toFixed(5)}`;
+            } else {
+                responseMessage = `❌ No price data available for ${symbol}`;
+            }
         } else {
             responseMessage = '❌ Unsupported asset';
         }
