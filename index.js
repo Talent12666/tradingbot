@@ -122,9 +122,14 @@ function sendWhatsAppAlert(user, message) {
         .catch((error) => console.error('Twilio error:', error));
 }
 
+// Calculate winrate based on signal success chance
+function calculateWinrate(successChance) {
+    return `${(successChance * 100).toFixed(1)}%`;
+}
+
 // Greeting message
 const GREETING_MESSAGE = `
-📈 ShadowFx Trading Bot 📈
+📈 Space Zero Trading Bot 📈
 Supported Instruments:
 • Forex: EURUSD, GBPUSD, USDJPY, AUDUSD, USDCAD, USDCHF, NZDUSD, EURGBP, USDSEK, USDNOK, USDTRY, EURJPY, GBPJPY
 • Commodities: XAUUSD, XAGUSD, XPTUSD, XPDUSD, CL1, NG1, CO1, HG1
@@ -132,6 +137,7 @@ Supported Instruments:
 • Crypto: BTCUSD, ETHUSD, XRPUSD, LTCUSD, BCHUSD, ADAUSD, DOTUSD, SOLUSD
 • ETFs: SPY, QQQ, GLD, XLF, IWM, EEM
 • Stocks: AAPL, TSLA, AMZN, GOOGL, MSFT, META, NVDA, NFLX
+• Synthetics: R_100, R_50, R_25, R_10, JD10, JD25, JD50, JD100, BOOM300, BOOM500, BOOM1000, CRASH300, CRASH500, CRASH1000
 
 Commands:
 ➤ Analysis: XAUUSD
@@ -163,10 +169,12 @@ app.post('/webhook', (req, res) => {
     } else if (incomingMsg in SYMBOL_MAP) {
         const symbol = incomingMsg;
         // Simulate analysis (replace with actual logic)
+        const successChance = Math.random(); // Random success chance between 0 and 1
+        const winrate = calculateWinrate(successChance);
         responseMessage = `
 📊 ${symbol} Analysis
 Signal: BUY
-Winrate: 75.5%
+Winrate: ${winrate}
 M15 trend: Up trend
 Entry: 1800.50
 SL: 1795.00
