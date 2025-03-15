@@ -73,13 +73,17 @@ function connect() {
 
     ws.on('message', (data) => {
         const msg = JSON.parse(data);
+        console.log('WebSocket message:', msg); // Log all incoming messages
+
         if (msg.msg_type === 'tick' && msg.tick) {
             const { symbol, bid, ask, quote } = msg.tick;
-            const price = bid !== undefined ? (bid + ask)/2 : quote;
-            
+            const price = bid !== undefined ? (bid + ask) / 2 : quote;
+
             if (!priceHistory[symbol]) priceHistory[symbol] = [];
             priceHistory[symbol].push(price);
             if (priceHistory[symbol].length > 20) priceHistory[symbol].shift();
+
+            console.log(`Price update for ${symbol}: ${price}`);
         }
     });
 
@@ -93,29 +97,7 @@ function connect() {
 
 let ws = connect();
 
-// 15m Price Action Analysis
-function analyzeTrend(prices) {
-    if (prices.length < 15) return "Insufficient data";
-    const segment = prices.slice(-15);
-    return segment[14] > segment[0] ? "Bullish" : "Bearish";
-}
-
-// Generate Signals
-function generateSignal(trend) {
-    const strength = trend === "Bullish" ? Math.random()*0.3 + 0.6 : Math.random()*0.25 + 0.55;
-    return {
-        direction: trend === "Bullish" ? "BUY" : "SELL",
-        confidence: `${Math.floor(strength*100)}%`,
-        sl: (currentPrice) => trend === "Bullish" 
-            ? (currentPrice * 0.9975).toFixed(5) 
-            : (currentPrice * 1.0025).toFixed(5),
-        tp1: (currentPrice) => trend === "Bullish"
-            ? (currentPrice * 1.0050).toFixed(5)
-            : (currentPrice * 0.9950).toFixed(5)
-    };
-}
-
-// Updated Greeting Message
+// Greeting message
 const GREETING = `📈 Trading Bot - Supported Assets:
 Forex: EURUSD, GBPUSD, USDJPY, AUDUSD, USDCAD, USDCHF, NZDUSD, EURGBP
 Commodities: XAUUSD, XAGUSD, XPTUSD, XPDUSD
@@ -150,9 +132,13 @@ app.post('/webhook', (req, res) => {
         else if (msg.startsWith('PRICE ')) {
             const asset = msg.split(' ')[1];
             const derivSymbol = SYMBOL_MAP[asset];
-            response = derivSymbol && priceHistory[derivSymbol]?.length 
-                ? `${asset}: ${priceHistory[derivSymbol].slice(-1)[0].toFixed(5)}`
-                : "Invalid asset";
+            if (!derivSymbol) {
+                response = "❌ Invalid asset";
+            } else if (!priceHistory[derivSymbol]?.length) {
+                response = `❌ No price data received yet for ${asset}. Try again later.`;
+            } else {
+                response = `${asset}: ${priceHistory[derivSymbol].slice(-1)[0].toFixed(5)}`;
+            }
         }
         else if (SYMBOL_MAP[msg]) {
             const derivSymbol = SYMBOL_MAP[msg];
