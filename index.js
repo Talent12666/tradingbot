@@ -51,14 +51,14 @@ const SYMBOL_MAP = {
     "CRASH300": "crash300", "CRASH500": "crash500", "CRASH1000": "crash1000"
 };
 
-// Store price history for trend analysis (last 15 prices)
+// Store price history for trend analysis (last 50 prices)
 const priceHistory = {};
 
 // WebSocket connection manager
 let wsPingInterval;
 
 function connect() {
-    const ws = new WebSocket('wss://ws.derivws.com/websockets/v3?app_id=69860');
+    const ws = new WebSocket('wss://ws.derivws.com/websockets/v3?app_id=1089');
 
     ws.on('open', () => {
         console.log('WS Connected');
@@ -82,7 +82,7 @@ function connect() {
 
             if (!priceHistory[symbol]) priceHistory[symbol] = [];
             priceHistory[symbol].push(price);
-            if (priceHistory[symbol].length > 15) priceHistory[symbol].shift();
+            if (priceHistory[symbol].length > 50) priceHistory[symbol].shift();
 
             console.log(`Price update for ${symbol}: ${price}`);
         }
@@ -104,26 +104,46 @@ function connect() {
 // Start WebSocket connection
 let ws = connect();
 
-// Determine trend using SMA (Simple Moving Average)
+// Calculate SMA (Simple Moving Average)
+function calculateSMA(prices, period) {
+    if (prices.length < period) return null;
+    return prices.slice(-period).reduce((a, b) => a + b, 0) / period;
+}
+
+// Determine trend using 20 SMA and 50 SMA
 function determineTrend(symbol) {
     const prices = priceHistory[symbol] || [];
-    if (prices.length < 10) return "N/A (Insufficient data)";
-    
-    // Calculate 5-period SMA
-    const sma = prices.slice(-5).reduce((a, b) => a + b, 0) / 5;
-    const currentPrice = prices[prices.length - 1];
-    
-    return currentPrice > sma ? "Up trend" : "Down trend";
+    const sma20 = calculateSMA(prices, 20);
+    const sma50 = calculateSMA(prices, 50);
+
+    if (!sma20 || !sma50) return "N/A (Insufficient data)";
+    return sma20 > sma50 ? "Bullish" : "Bearish";
 }
 
 // Generate signal with winrate >50%
 function generateSignal(trend) {
-    const baseChance = trend.includes("Up") ? 0.65 : 0.60;
+    const baseChance = trend === "Bullish" ? 0.65 : 0.60;
     const successChance = Math.min(baseChance + Math.random() * 0.15, 0.95);
     return {
-        signal: trend.includes("Up") ? "BUY" : "SELL",
-        winrate: `${(successChance * 100).toFixed(1)}%`
+        signal: trend === "Bullish" ? "BUY" : "SELL",
+        confidence: `${Math.floor(successChance * 100)}%`
     };
+}
+
+// Calculate SL and TP using 15-minute timeframe
+function calculateLevels(currentPrice, trend) {
+    const volatilityFactor = 0.0035; // 0.35% for 15-minute timeframe
+    const sl = trend === "Bullish" 
+        ? (currentPrice * (1 - volatilityFactor)).toFixed(5) 
+        : (currentPrice * (1 + volatilityFactor)).toFixed(5);
+    const tp1 = trend === "Bullish"
+        ? (currentPrice * (1 + volatilityFactor)).toFixed(5)
+        : (currentPrice * (1 - volatilityFactor)).toFixed(5);
+    const tp2 = trend === "Bullish"
+        ? (currentPrice * (1 + volatilityFactor * 2)).toFixed(5)
+        : (currentPrice * (1 - volatilityFactor * 2)).toFixed(5);
+
+    return { sl, tp1, tp2 };
 }
 
 // Greeting message
@@ -172,7 +192,7 @@ app.post('/webhook', (req, res) => {
                 if (prices.length > 0) {
                     responseMessage = `Current ${symbol}: ${prices[prices.length - 1].toFixed(5)}`;
                 } else {
-                    responseMessage = `❌ Waiting for ${symbol} data...`;
+                    responseMessage = `❌ No price data received yet for ${symbol}.`;
                 }
             } else {
                 responseMessage = '❌ Unsupported asset';
@@ -180,31 +200,19 @@ app.post('/webhook', (req, res) => {
         } else if (incomingMsg in SYMBOL_MAP) {
             const derivSymbol = SYMBOL_MAP[incomingMsg];
             const prices = priceHistory[derivSymbol] || [];
-            
-            if (prices.length < 10) {
-                responseMessage = `❌ Collecting ${incomingMsg} data... (${prices.length}/10)`;
+            const currentPrice = prices.length > 0 ? prices[prices.length - 1] : null;
+
+            if (!currentPrice) {
+                responseMessage = `❌ No price data received yet for ${incomingMsg}.`;
             } else {
                 const trend = determineTrend(derivSymbol);
-                const { signal, winrate } = generateSignal(trend);
-                const currentPrice = prices[prices.length - 1];
-                
-                // Calculate SL and TP
-                const sl = signal === "BUY" 
-                    ? (currentPrice * 0.9975).toFixed(5) 
-                    : (currentPrice * 1.0025).toFixed(5);
-                    
-                const tp1 = signal === "BUY"
-                    ? (currentPrice * 1.0025).toFixed(5)
-                    : (currentPrice * 0.9975).toFixed(5);
-
-                const tp2 = signal === "BUY"
-                    ? (currentPrice * 1.0050).toFixed(5)
-                    : (currentPrice * 0.9950).toFixed(5);
+                const { signal, confidence } = generateSignal(trend);
+                const { sl, tp1, tp2 } = calculateLevels(currentPrice, trend);
 
                 responseMessage = `
 📊 ${incomingMsg} Analysis
 Trend: ${trend}
-Signal: ${signal} (${winrate} Success Chance)
+Signal: ${signal} (${confidence} Success Chance)
 Entry: ${currentPrice.toFixed(5)}
 SL: ${sl}
 TP1: ${tp1}
