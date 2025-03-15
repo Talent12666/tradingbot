@@ -175,19 +175,24 @@ app.post('/webhook', (req, res) => {
         }
     } else if (incomingMsg in SYMBOL_MAP) {
         const symbol = incomingMsg;
-        // Simulate analysis (replace with actual logic)
-        const successChance = Math.random(); // Random success chance between 0 and 1
-        const winrate = calculateWinrate(successChance);
-        responseMessage = `
+        const price = latestPrices[symbol]; // Get the latest price
+        if (price === undefined) {
+            responseMessage = `❌ No price data available for ${symbol}`;
+        } else {
+            // Simulate analysis (replace with actual logic)
+            const successChance = Math.random(); // Random success chance between 0 and 1
+            const winrate = calculateWinrate(successChance);
+            responseMessage = `
 📊 ${symbol} Analysis
-Signal: BUY
+Signal: ${successChance > 0.5 ? 'BUY' : 'SELL'}
 Winrate: ${winrate}
 M15 trend: Up trend
-Entry: 1800.50
-SL: 1795.00
-TP1: 1810.00
-TP2: 1820.00
+Entry: ${price.toFixed(5)}
+SL: ${(price * 0.995).toFixed(5)}
+TP1: ${(price * 1.005).toFixed(5)}
+TP2: ${(price * 1.010).toFixed(5)}
 `;
+        }
     } else if (incomingMsg.startsWith('ALERT ')) {
         const symbol = incomingMsg.split(' ')[1];
         if (SYMBOL_MAP[symbol]) {
