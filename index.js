@@ -82,8 +82,7 @@ function connect() {
             const derivSymbol = SYMBOL_MAP[symbol].symbol;
             ws.send(JSON.stringify({ 
                 ticks: derivSymbol,
-                subscribe: 1,
-                style: "ticks"
+                subscribe: 1, // Remove the `style` property
             }));
             console.log(`Subscribed to ${symbol} (${derivSymbol})`);
             
