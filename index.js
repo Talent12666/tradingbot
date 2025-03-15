@@ -15,58 +15,58 @@ if (!process.env.TWILIO_SID || !process.env.TWILIO_AUTH_TOKEN) {
 // Twilio setup
 const twilioClient = new twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
 
-// Pairs mapping (including all synthetics)
+// Pairs mapping (including all synthetics) - Updated according to Deriv
 const SYMBOL_MAP = {
     // Forex
-    "EURUSD": { symbol: "EUR/USD", category: "forex" },
-    "GBPUSD": { symbol: "GBP/USD", category: "forex" },
-    "USDJPY": { symbol: "USD/JPY", category: "forex" },
-    "AUDUSD": { symbol: "AUD/USD", category: "forex" },
-    "USDCAD": { symbol: "USD/CAD", category: "forex" },
-    "USDCHF": { symbol: "USD/CHF", category: "forex" },
-    "NZDUSD": { symbol: "NZD/USD", category: "forex" },
-    "EURGBP": { symbol: "EUR/GBP", category: "forex" },
-    "EURJPY": { symbol: "EUR/JPY", category: "forex" },
-    "GBPJPY": { symbol: "GBP/JPY", category: "forex" },
+    "EURUSD": { symbol: "frxEURUSD", category: "forex" },
+    "GBPUSD": { symbol: "frxGBPUSD", category: "forex" },
+    "USDJPY": { symbol: "frxUSDJPY", category: "forex" },
+    "AUDUSD": { symbol: "frxAUDUSD", category: "forex" },
+    "USDCAD": { symbol: "frxUSDCAD", category: "forex" },
+    "USDCHF": { symbol: "frxUSDCHF", category: "forex" },
+    "NZDUSD": { symbol: "frxNZDUSD", category: "forex" },
+    "EURGBP": { symbol: "frxEURGBP", category: "forex" },
+    "EURJPY": { symbol: "frxEURJPY", category: "forex" },
+    "GBPJPY": { symbol: "frxGBPJPY", category: "forex" },
     // Commodities
-    "XAUUSD": { symbol: "Gold/USD", category: "commodities" },
-    "XAGUSD": { symbol: "Silver/USD", category: "commodities" },
-    "XPTUSD": { symbol: "Platinum/USD", category: "commodities" },
-    "XPDUSD": { symbol: "Palladium/USD", category: "commodities" },
+    "XAUUSD": { symbol: "frxXAUUSD", category: "commodities" },
+    "XAGUSD": { symbol: "frxXAGUSD", category: "commodities" },
+    "XPTUSD": { symbol: "frxXPTUSD", category: "commodities" },
+    "XPDUSD": { symbol: "frxXPDUSD", category: "commodities" },
     // Indices
-    "SPX": { symbol: "S&P 500", category: "indices" },
-    "NDX": { symbol: "Nasdaq 100", category: "indices" },
-    "DJI": { symbol: "Dow Jones", category: "indices" },
-    "FTSE": { symbol: "FTSE 100", category: "indices" },
-    "DAX": { symbol: "DAX 30", category: "indices" },
-    "NIKKEI": { symbol: "Nikkei 225", category: "indices" },
-    "HSI": { symbol: "Hang Seng", category: "indices" },
-    "ASX": { symbol: "ASX 200", category: "indices" },
-    "CAC": { symbol: "CAC 40", category: "indices" },
+    "SPX": { symbol: "RDBULL", category: "indices" }, // Example: Volatility 100 Index
+    "NDX": { symbol: "frxNAS100", category: "indices" },
+    "DJI": { symbol: "frxDJ30", category: "indices" },
+    "FTSE": { symbol: "frxUK100", category: "indices" },
+    "DAX": { symbol: "frxGER30", category: "indices" },
+    "NIKKEI": { symbol: "frxJP225", category: "indices" },
+    "HSI": { symbol: "frxHK50", category: "indices" },
+    "ASX": { symbol: "frxAUS200", category: "indices" },
+    "CAC": { symbol: "frxFRA40", category: "indices" },
     // Cryptos
-    "BTCUSD": { symbol: "BTC/USD", category: "crypto" },
-    "ETHUSD": { symbol: "ETH/USD", category: "crypto" },
-    "XRPUSD": { symbol: "XRP/USD", category: "crypto" },
-    "LTCUSD": { symbol: "LTC/USD", category: "crypto" },
-    "BCHUSD": { symbol: "BCH/USD", category: "crypto" },
-    "ADAUSD": { symbol: "ADA/USD", category: "crypto" },
-    "DOTUSD": { symbol: "DOT/USD", category: "crypto" },
-    "SOLUSD": { symbol: "SOL/USD", category: "crypto" },
+    "BTCUSD": { symbol: "cryBTCUSD", category: "crypto" },
+    "ETHUSD": { symbol: "cryETHUSD", category: "crypto" },
+    "XRPUSD": { symbol: "cryXRPUSD", category: "crypto" },
+    "LTCUSD": { symbol: "cryLTCUSD", category: "crypto" },
+    "BCHUSD": { symbol: "cryBCHUSD", category: "crypto" },
+    "ADAUSD": { symbol: "cryADAUSD", category: "crypto" },
+    "DOTUSD": { symbol: "cryDOTUSD", category: "crypto" },
+    "SOLUSD": { symbol: "crySOLUSD", category: "crypto" },
     // Synthetics
-    "R_100": { symbol: "Volatility 100 Index", category: "synthetics" },
-    "R_50": { symbol: "Volatility 50 Index", category: "synthetics" },
-    "R_25": { symbol: "Volatility 25 Index", category: "synthetics" },
-    "R_10": { symbol: "Volatility 10 Index", category: "synthetics" },
-    "JD10": { symbol: "Jump 10 Index", category: "synthetics" },
-    "JD25": { symbol: "Jump 25 Index", category: "synthetics" },
-    "JD50": { symbol: "Jump 50 Index", category: "synthetics" },
-    "JD100": { symbol: "Jump 100 Index", category: "synthetics" },
-    "BOOM300": { symbol: "Boom 300 Index", category: "synthetics" },
-    "BOOM500": { symbol: "Boom 500 Index", category: "synthetics" },
-    "BOOM1000": { symbol: "Boom 1000 Index", category: "synthetics" },
-    "CRASH300": { symbol: "Crash 300 Index", category: "synthetics" },
-    "CRASH500": { symbol: "Crash 500 Index", category: "synthetics" },
-    "CRASH1000": { symbol: "Crash 1000 Index", category: "synthetics" },
+    "R_100": { symbol: "1HZ100V", category: "synthetics" }, // Volatility 100 Index
+    "R_50": { symbol: "1HZ50V", category: "synthetics" }, // Volatility 50 Index
+    "R_25": { symbol: "1HZ25V", category: "synthetics" }, // Volatility 25 Index
+    "R_10": { symbol: "1HZ10V", category: "synthetics" }, // Volatility 10 Index
+    "JD10": { symbol: "JD10", category: "synthetics" }, // Jump 10 Index
+    "JD25": { symbol: "JD25", category: "synthetics" }, // Jump 25 Index
+    "JD50": { symbol: "JD50", category: "synthetics" }, // Jump 50 Index
+    "JD100": { symbol: "JD100", category: "synthetics" }, // Jump 100 Index
+    "BOOM300": { symbol: "BOOM300", category: "synthetics" }, // Boom 300 Index
+    "BOOM500": { symbol: "BOOM500", category: "synthetics" }, // Boom 500 Index
+    "BOOM1000": { symbol: "BOOM1000", category: "synthetics" }, // Boom 1000 Index
+    "CRASH300": { symbol: "CRASH300", category: "synthetics" }, // Crash 300 Index
+    "CRASH500": { symbol: "CRASH500", category: "synthetics" }, // Crash 500 Index
+    "CRASH1000": { symbol: "CRASH1000", category: "synthetics" }, // Crash 1000 Index
 };
 
 // Store the latest prices for each symbol
@@ -80,7 +80,7 @@ ws.on('open', () => {
     // Subscribe to all pairs
     Object.keys(SYMBOL_MAP).forEach(symbol => {
         const payload = {
-            ticks: symbol,
+            ticks: SYMBOL_MAP[symbol].symbol, // Use Deriv symbol mapping
             subscribe: 1,
         };
         ws.send(JSON.stringify(payload));
@@ -131,6 +131,14 @@ function calculateWinrate(successChance) {
     return `${(successChance * 100).toFixed(1)}%`;
 }
 
+// Determine trend (uptrend or downtrend)
+function determineTrend(prices) {
+    if (prices.length < 2) return "N/A";
+    const lastPrice = prices[prices.length - 1];
+    const prevPrice = prices[prices.length - 2];
+    return lastPrice > prevPrice ? "Up trend" : "Down trend";
+}
+
 // Greeting message
 const GREETING_MESSAGE = `
 📈 Space Zero Trading Bot 📈
@@ -164,7 +172,7 @@ app.post('/webhook', (req, res) => {
     } else if (incomingMsg.startsWith('PRICE ')) {
         const symbol = incomingMsg.split(' ')[1];
         if (SYMBOL_MAP[symbol]) {
-            const price = latestPrices[symbol]; // Get the latest price from WebSocket data
+            const price = latestPrices[SYMBOL_MAP[symbol].symbol]; // Get the latest price from WebSocket data
             if (price !== undefined) {
                 responseMessage = `Current ${symbol}: ${price.toFixed(5)}`;
             } else {
@@ -174,23 +182,29 @@ app.post('/webhook', (req, res) => {
             responseMessage = '❌ Unsupported asset';
         }
     } else if (incomingMsg in SYMBOL_MAP) {
-        const symbol = incomingMsg;
+        const symbol = SYMBOL_MAP[incomingMsg].symbol; // Use Deriv symbol mapping
         const price = latestPrices[symbol]; // Get the latest price
         if (price === undefined) {
-            responseMessage = `❌ No price data available for ${symbol}`;
+            responseMessage = `❌ No price data available for ${incomingMsg}`;
         } else {
             // Simulate analysis (replace with actual logic)
             const successChance = Math.random(); // Random success chance between 0 and 1
             const winrate = calculateWinrate(successChance);
+            const trend = determineTrend([price]); // Replace with actual trend calculation
+            const signal = trend === "Up trend" ? "BUY" : "SELL";
+            const sl = signal === "BUY" ? (price * 0.995).toFixed(5) : (price * 1.005).toFixed(5);
+            const tp1 = signal === "BUY" ? (price * 1.005).toFixed(5) : (price * 0.995).toFixed(5);
+            const tp2 = signal === "BUY" ? (price * 1.010).toFixed(5) : (price * 0.990).toFixed(5);
+
             responseMessage = `
-📊 ${symbol} Analysis
-Signal: ${successChance > 0.5 ? 'BUY' : 'SELL'}
+📊 ${incomingMsg} Analysis
+Signal: ${signal}
 Winrate: ${winrate}
-M15 trend: Up trend
+M15 trend: ${trend}
 Entry: ${price.toFixed(5)}
-SL: ${(price * 0.995).toFixed(5)}
-TP1: ${(price * 1.005).toFixed(5)}
-TP2: ${(price * 1.010).toFixed(5)}
+SL: ${sl}
+TP1: ${tp1}
+TP2: ${tp2}
 `;
         }
     } else if (incomingMsg.startsWith('ALERT ')) {
