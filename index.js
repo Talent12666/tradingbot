@@ -12,6 +12,7 @@ if (!process.env.TWILIO_SID || !process.env.TWILIO_AUTH_TOKEN) {
     process.exit(1);
 }
 
+// Twilio setup
 const twilioClient = new twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
 
 // Full list of all instruments including ALL synthetics
@@ -56,7 +57,7 @@ const priceHistory = {};
 let wsPingInterval;
 
 function connect() {
-    const ws = new WebSocket('wss://ws.derivws.com/websockets/v3?app_id=1089');
+    const ws = new WebSocket('wss://ws.derivws.com/websockets/v3?app_id=69860');
 
     ws.on('open', () => {
         console.log('WS Connected');
@@ -128,9 +129,20 @@ Commands:
 ➤ Analysis: XAUUSD
 ➤ Price: PRICE BTCUSD`;
 
+// Apply body parsing middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
 // Webhook Handler
 app.post('/webhook', (req, res) => {
-    const msg = req.body.Body.trim().toUpperCase();
+    console.log('Incoming request headers:', req.headers);
+    console.log('Incoming request body:', req.body);
+
+    if (!req.body) {
+        return res.status(400).send('Bad Request: No body provided');
+    }
+
+    const msg = req.body.Body?.trim().toUpperCase() || '';
     let response = '';
     
     try {
@@ -163,6 +175,7 @@ TP: ${signal.tp1(currentPrice)}`;
         }
         else response = "Invalid command";
     } catch (err) {
+        console.error('Error processing request:', err);
         response = "Error processing request";
     }
 
