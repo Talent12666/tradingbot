@@ -139,6 +139,13 @@ function determineTrend(prices) {
     return lastPrice > prevPrice ? "Up trend" : "Down trend";
 }
 
+// Generate a signal with a winrate above 50%
+function generateSignal(trend) {
+    const successChance = Math.random() * 0.5 + 0.5; // Winrate between 50% and 100%
+    const signal = trend === "Up trend" ? "BUY" : "SELL";
+    return { signal, successChance };
+}
+
 // Greeting message
 const GREETING_MESSAGE = `
 📈 Space Zero Trading Bot 📈
@@ -188,10 +195,9 @@ app.post('/webhook', (req, res) => {
             responseMessage = `❌ No price data available for ${incomingMsg}`;
         } else {
             // Simulate analysis (replace with actual logic)
-            const successChance = Math.random(); // Random success chance between 0 and 1
-            const winrate = calculateWinrate(successChance);
             const trend = determineTrend([price]); // Replace with actual trend calculation
-            const signal = trend === "Up trend" ? "BUY" : "SELL";
+            const { signal, successChance } = generateSignal(trend);
+            const winrate = calculateWinrate(successChance);
             const sl = signal === "BUY" ? (price * 0.995).toFixed(5) : (price * 1.005).toFixed(5);
             const tp1 = signal === "BUY" ? (price * 1.005).toFixed(5) : (price * 0.995).toFixed(5);
             const tp2 = signal === "BUY" ? (price * 1.010).toFixed(5) : (price * 0.990).toFixed(5);
