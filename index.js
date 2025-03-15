@@ -165,52 +165,56 @@ Commands:
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Webhook handler with enhanced logging
 app.post('/webhook', (req, res) => {
-    const incomingMsg = req.body.Body.trim().toUpperCase();
-    const userNumber = req.body.From;
+    console.log('Received WhatsApp message:', req.body);  // Log raw incoming message
+    
+    const incomingMsg = req.body.Body?.trim().toUpperCase() || '';
+    const userNumber = req.body.From || '';
 
     let responseMessage = '';
-
-    if (incomingMsg === 'HI' || incomingMsg === 'HELLO' || incomingMsg === 'START') {
-        responseMessage = GREETING_MESSAGE;
-    } else if (incomingMsg.startsWith('PRICE ')) {
-        const symbol = incomingMsg.split(' ')[1];
-        if (SYMBOL_MAP[symbol]) {
-            const derivSymbol = SYMBOL_MAP[symbol].symbol;
-            const prices = priceHistory[derivSymbol] || [];
-            if (prices.length > 0) {
-                responseMessage = `Current ${symbol}: ${prices[prices.length - 1].toFixed(5)}`;
+    
+    try {
+        if (incomingMsg === 'HI' || incomingMsg === 'HELLO' || incomingMsg === 'START') {
+            responseMessage = GREETING_MESSAGE;
+        } else if (incomingMsg.startsWith('PRICE ')) {
+            const symbol = incomingMsg.split(' ')[1];
+            if (SYMBOL_MAP[symbol]) {
+                const derivSymbol = SYMBOL_MAP[symbol].symbol;
+                const prices = priceHistory[derivSymbol] || [];
+                if (prices.length > 0) {
+                    responseMessage = `Current ${symbol}: ${prices[prices.length - 1].toFixed(5)}`;
+                } else {
+                    responseMessage = `❌ Waiting for ${symbol} data...`;
+                }
             } else {
-                responseMessage = `❌ Waiting for ${symbol} data...`;
+                responseMessage = '❌ Unsupported asset';
             }
-        } else {
-            responseMessage = '❌ Unsupported asset';
-        }
-    } else if (incomingMsg in SYMBOL_MAP) {
-        const derivSymbol = SYMBOL_MAP[incomingMsg].symbol;
-        const prices = priceHistory[derivSymbol] || [];
-        
-        if (prices.length < 10) {
-            responseMessage = `❌ Collecting ${incomingMsg} data... (${prices.length}/10)`;
-        } else {
-            const trend = determineTrend(derivSymbol);
-            const { signal, winrate } = generateSignal(trend);
-            const currentPrice = prices[prices.length - 1];
+        } else if (incomingMsg in SYMBOL_MAP) {
+            const derivSymbol = SYMBOL_MAP[incomingMsg].symbol;
+            const prices = priceHistory[derivSymbol] || [];
             
-            // Calculate levels based on 5m/1m timeframes
-            const sl = signal === "BUY" 
-                ? (currentPrice * 0.9975).toFixed(5)  // 0.25% below for BUY
-                : (currentPrice * 1.0025).toFixed(5); // 0.25% above for SELL
+            if (prices.length < 10) {
+                responseMessage = `❌ Collecting ${incomingMsg} data... (${prices.length}/10)`;
+            } else {
+                const trend = determineTrend(derivSymbol);
+                const { signal, winrate } = generateSignal(trend);
+                const currentPrice = prices[prices.length - 1];
                 
-            const tp1 = signal === "BUY"
-                ? (currentPrice * 1.0025).toFixed(5)  // 0.25% above
-                : (currentPrice * 0.9975).toFixed(5); // 0.25% below
+                // Calculate levels based on 5m/1m timeframes
+                const sl = signal === "BUY" 
+                    ? (currentPrice * 0.9975).toFixed(5)  // 0.25% below for BUY
+                    : (currentPrice * 1.0025).toFixed(5); // 0.25% above for SELL
+                    
+                const tp1 = signal === "BUY"
+                    ? (currentPrice * 1.0025).toFixed(5)  // 0.25% above
+                    : (currentPrice * 0.9975).toFixed(5); // 0.25% below
 
-            const tp2 = signal === "BUY"
-                ? (currentPrice * 1.0050).toFixed(5)  // 0.50% above
-                : (currentPrice * 0.9950).toFixed(5); // 0.50% below
+                const tp2 = signal === "BUY"
+                    ? (currentPrice * 1.0050).toFixed(5)  // 0.50% above
+                    : (currentPrice * 0.9950).toFixed(5); // 0.50% below
 
-            responseMessage = `
+                responseMessage = `
 📊 ${incomingMsg} Analysis
 Trend: ${trend}
 Signal: ${signal} (${winrate} Success Chance)
@@ -219,18 +223,24 @@ SL: ${sl} (1m timeframe)
 TP1: ${tp1} (5m timeframe)
 TP2: ${tp2} (15m timeframe)
 `;
-        }
-    } else if (incomingMsg.startsWith('ALERT ')) {
-        const symbol = incomingMsg.split(' ')[1];
-        if (SYMBOL_MAP[symbol]) {
-            responseMessage = `🔔 Alerts activated for ${symbol}`;
+            }
+        } else if (incomingMsg.startsWith('ALERT ')) {
+            const symbol = incomingMsg.split(' ')[1];
+            if (SYMBOL_MAP[symbol]) {
+                responseMessage = `🔔 Alerts activated for ${symbol}`;
+            } else {
+                responseMessage = '❌ Unsupported asset';
+            }
         } else {
-            responseMessage = '❌ Unsupported asset';
+            responseMessage = '❌ Invalid command. Send "HI" for help';
         }
-    } else {
-        responseMessage = '❌ Invalid command. Send "HI" for help';
+    } catch (error) {
+        console.error('Error processing message:', error);
+        responseMessage = '⚠️ Bot encountered an error. Please try again.';
     }
 
+    // Always respond with valid TwiML
+    console.log('Sending response:', responseMessage);  // Log outgoing response
     res.set('Content-Type', 'text/xml');
     res.send(`
         <Response>
